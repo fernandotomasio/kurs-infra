@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:4.4.6
+    environment:
+      MONGO_INITDB_DATABASE: mydatabase
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    depends_on:
+      - zookeeper
+      
+  postgres:
+    build:
+      context: ./postgresql
+      dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: camunda,keycloak
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  keycloak:
+    image: jboss/keycloak
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres
+      DB_PORT: 5432
+      DB_DATABASE: keycloak
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+    ports:
+      - "8084:8080"
+    depends_on:
+      - postgres
+
+  camunda:
+    image: camunda/camunda-bpm-platform:7.18.0
+    environment:
+      CAMUNDA_BPM_DATABASE_TYPE: postgres
+      CAMUNDA_BPM_DATABASE_HOST: postgres
+      CAMUNDA_BPM_DATABASE_PORT: 5432
+      CAMUNDA_BPM_DATABASE_NAME: camunda
+      CAMUNDA_BPM_DATABASE_SCHEMA_UPDATE: true
+      CAMUNDA_BPM_ADMIN_USER: demo
+      CAMUNDA_BPM_ADMIN_PASSWORD: demo
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:6.1.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"  
+  kafka:
+    image: confluentinc/cp-kafka:6.1.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+volumes:
+  postgres-data:
+  mongo-data:
